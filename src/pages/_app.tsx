@@ -2,9 +2,23 @@ import "../styles/globals.css";
 import type { AppType } from "next/dist/shared/lib/utils";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { data, gamesPlayed } from "../data";
+import { data, Game } from "../data";
 
 const queryClient = new QueryClient();
+
+type gamePlayed = {
+  score: {
+    [team: string]: number;
+  };
+  date: string;
+};
+
+type nextGames = {
+  score: {
+    [team: string]: null;
+  };
+  date: string;
+};
 
 export type ClubStats = {
   club: string;
@@ -12,9 +26,9 @@ export type ClubStats = {
   loss: number;
   draw: number;
   totalPoints: number;
-  gamesPlayed: gamesPlayed[];
+  gamesPlayed: gamePlayed[];
   numberGamesPlayed: number;
-  nextGames: gamesPlayed[];
+  nextGames: nextGames[];
   goalDifference: number;
 };
 
@@ -27,12 +41,20 @@ export function getData() {
     return !Number.isNaN(new Date(date).getTime());
   }
 
+  function isGamePlayed(Game: Game, clubKey: string): Game is gamePlayed {
+    return typeof Game.score[clubKey] === "number";
+  }
+
+  function isNextGame(nextGame: Game, clubKey: string): nextGame is nextGames {
+    return nextGame.score[clubKey] === null;
+  }
+
   return data.reduce((acc: ClubsObj, curr) => {
-    const [club1, club2] = Object.keys(curr.score);
-    if (club1 === undefined || club2 === undefined) return acc;
-    if (acc[club1] === undefined) {
-      acc[club1] = {
-        club: club1,
+    const [clubKey1, clubKey2] = Object.keys(curr.score);
+    if (clubKey1 === undefined || clubKey2 === undefined) return acc;
+    if (acc[clubKey1] === undefined) {
+      acc[clubKey1] = {
+        club: clubKey1,
         win: 0,
         loss: 0,
         draw: 0,
@@ -43,9 +65,9 @@ export function getData() {
         nextGames: [],
       };
     }
-    if (acc[club2] === undefined) {
-      acc[club2] = {
-        club: club2,
+    if (acc[clubKey2] === undefined) {
+      acc[clubKey2] = {
+        club: clubKey2,
         win: 0,
         loss: 0,
         draw: 0,
@@ -56,51 +78,49 @@ export function getData() {
         nextGames: [],
       };
     }
+    const club1 = acc[clubKey1] as ClubStats;
+    const club2 = acc[clubKey2] as ClubStats;
 
     if (isValidDate(curr.date)) {
       curr.date = format(new Date(curr.date), "dd/MM HH:mm");
     }
 
-    if (curr.score[club1] === null) {
-      acc[club1]!.nextGames.push(curr);
-      acc[club2]!.nextGames.push(curr);
-    } else if (curr.score[club1]! > curr.score[club2]!) {
-      acc[club1]!.win = acc[club1]!.win + 1;
-      acc[club1]!.goalDifference =
-        acc[club1]!.goalDifference +
-        Math.abs(curr.score[club1]! - curr.score[club2]!);
-      acc[club2]!.goalDifference =
-        acc[club2]!.goalDifference -
-        Math.abs(curr.score[club1]! - curr.score[club2]!);
-      acc[club1]!.totalPoints = acc[club1]!.totalPoints + 3;
-      acc[club1]!.gamesPlayed.push(curr);
-      acc[club1]!.numberGamesPlayed = acc[club1]!.gamesPlayed.length;
-      acc[club2]!.gamesPlayed.push(curr);
-      acc[club2]!.numberGamesPlayed = acc[club2]!.gamesPlayed.length;
-      acc[club2]!.loss = acc[club2]!.loss + 1;
-    } else if (curr.score[club2]! > curr.score[club1]!) {
-      acc[club2]!.win = acc[club2]!.win + 1;
-      acc[club2]!.goalDifference =
-        acc[club2]!.goalDifference +
-        Math.abs(curr.score[club1]! - curr.score[club2]!);
-      acc[club1]!.goalDifference =
-        acc[club1]!.goalDifference -
-        Math.abs(curr.score[club1]! - curr.score[club2]!);
-      acc[club2]!.totalPoints = acc[club2]!.totalPoints + 3;
-      acc[club1]!.loss = acc[club1]!.loss + 1;
-      acc[club1]!.gamesPlayed.push(curr);
-      acc[club1]!.numberGamesPlayed = acc[club1]!.gamesPlayed.length;
-      acc[club2]!.gamesPlayed.push(curr);
-      acc[club2]!.numberGamesPlayed = acc[club2]!.gamesPlayed.length;
-    } else {
-      acc[club2]!.draw = acc[club2]!.draw + 1;
-      acc[club1]!.draw = acc[club1]!.draw + 1;
-      acc[club2]!.totalPoints = acc[club2]!.totalPoints + 1;
-      acc[club1]!.totalPoints = acc[club1]!.totalPoints + 1;
-      acc[club1]!.gamesPlayed.push(curr);
-      acc[club1]!.numberGamesPlayed = acc[club1]!.gamesPlayed.length;
-      acc[club2]!.gamesPlayed.push(curr);
-      acc[club2]!.numberGamesPlayed = acc[club2]!.gamesPlayed.length;
+    if (isNextGame(curr, clubKey1)) {
+      club1.nextGames.push(curr);
+      club2.nextGames.push(curr);
+    } else if (isGamePlayed(curr, clubKey1)) {
+      const score1 = curr.score[clubKey1] as number
+      const score2 = curr.score[clubKey2] as number
+      if (score1 > score2) {
+        club1.win = club1.win + 1;
+        club2.loss = club2.loss + 1;
+        club1.gamesPlayed.push(curr);
+        club2.gamesPlayed.push(curr);
+        club1.goalDifference = club1.goalDifference + Math.abs(score1 - score2);
+        club2.goalDifference = club2.goalDifference - Math.abs(score1 - score2);
+        club1.totalPoints = club1.totalPoints + 3;
+        club1.numberGamesPlayed = club1.gamesPlayed.length;
+        club2.numberGamesPlayed = club2.gamesPlayed.length;
+      } else if (score2 > score1) {
+        club2.win = club2.win + 1;
+        club2.goalDifference = club2.goalDifference + Math.abs(score1 - score2);
+        club1.goalDifference = club1.goalDifference - Math.abs(score1 - score2);
+        club1.loss = club1.loss + 1;
+        club1.gamesPlayed.push(curr);
+        club1.numberGamesPlayed = club1.gamesPlayed.length;
+        club2.totalPoints = club2.totalPoints + 3;
+        club2.gamesPlayed.push(curr);
+        club2.numberGamesPlayed = club2.gamesPlayed.length;
+      } else {
+        club1.draw = club1.draw + 1;
+        club1.totalPoints = club1.totalPoints + 1;
+        club1.gamesPlayed.push(curr);
+        club1.numberGamesPlayed = club1.gamesPlayed.length;
+        club2.draw = club2.draw + 1;
+        club2.totalPoints = club2.totalPoints + 1;
+        club2.gamesPlayed.push(curr);
+        club2.numberGamesPlayed = club2.gamesPlayed.length;
+      }
     }
     return acc;
   }, {});
