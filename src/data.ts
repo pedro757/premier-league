@@ -1,11 +1,11 @@
-export type gamesPlayed = {
+export type Game = {
   score: {
     [team:string]: number | null
   }
   date: string
 }
 
-export const data:gamesPlayed[] = [
+export const data:Game[] = [
   {
     score: {
       "Manchester United": 1,
