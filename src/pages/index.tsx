@@ -9,7 +9,7 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { ClubStats, ClubsObj } from "./_app";
+import type { ClubStats, ClubsObj } from "../data";
 
 export function useClubsSorted() {
   const queryClient = useQueryClient();
